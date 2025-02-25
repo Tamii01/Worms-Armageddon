@@ -1,74 +1,121 @@
-# Worms-Armageddon
+# 🐛 Worms Armageddon en Assembly (ARM)  
 
-Este proyecto es una adaptación en ARM Assembly del clásico juego Worms Armageddon. En nuestra versión, dos gusanos se enfrentan en un mapa, disparando proyectiles con trayectorias lineales, en un sistema de turnos.
+Este proyecto es una adaptación del clásico **Worms Armageddon**, desarrollado en **ARM Assembly** y ejecutado en **PuTTY**. El objetivo es que dos equipos de gusanos compitan disparando proyectiles en un mapa hasta eliminar al equipo contrario.  
 
-## Modo de Juego
-Dos gusanos representados como @####, donde @ es la cabeza.
-El disparo sigue una trayectoria lineal determinada por la pendiente elegida por el jugador.
-Cada jugador tiene 5 intentos por turno.
-Si un gusano es alcanzado, su cabeza cambia a X para indicar su eliminación.
-Al finalizar el juego, se muestra "Game Over" y se actualiza la pantalla.
-El desarrollo se realizó desglosando los requisitos en tareas más pequeñas, priorizando aspectos clave como la representación del mapa y la implementación de los disparos.
+## 🎮 Mecánicas del Juego  
 
-## Implementación en ARM Assembly
+1. **Dos gusanos en un mapa** representados con `@####`, donde `@` es la cabeza.  
+2. **Disparos con trayectoria lineal**, definidos por el usuario ingresando una pendiente.  
+3. **Turnos alternos:** Cada jugador tiene **5 intentos** para acertar.  
+4. **Colisión e impacto:** Si un gusano es alcanzado, su cabeza (`@`) cambia a `X`.  
+5. **Fin del juego:** Al final de los turnos o cuando un gusano es eliminado, aparece **"Game Over"** y se actualiza la pantalla.  
 
-1. Representación del Mapa y Salida en Pantalla
-Para mostrar el mapa en pantalla, utilizamos la sección .data con el formato .asciz para almacenar la información. Implementamos una función output basada en una syscall (#4 en r7), que permite escribir en pantalla:
+## 🔧 Implementación en Assembly  
 
-  r7 = 4 → Indica que el sistema debe ejecutar una operación de escritura.
-  r0 = 1 → Define la salida estándar (pantalla).
-  r1 = Dirección del mapa → Carga la referencia en memoria.
-  r2 = Longitud del mapa → Define la cantidad de caracteres a imprimir.
-  Este método se basa en la Tabla de llamadas al sistema de Linux.
+### 🗺️ Representación del mapa  
+El mapa se almacena en la sección `.data` usando el formato `.asciz`. Para imprimirlo en pantalla, se usa la función `output`, que realiza una **syscall** (`mov r7, #4`).  
 
-2. Entrada de Datos (Lectura del Usuario)
-Para capturar la pendiente elegida por el usuario, implementamos una función input_x1, utilizando una syscall (#3 en r7) para leer datos del teclado:
+```assembly
+ldr r0,=mapa    @ Cargar la dirección de memoria del mapa
+mov r7, #4      @ Syscall para escribir en pantalla
+swi 0           @ Interrupción del sistema
+```
 
-  r0 = 0 → Indica entrada estándar (teclado).
-  r1 = Dirección en memoria → Guarda el valor ingresado.
-  r2 = 2 → Cantidad de caracteres a capturar.
-  Esta función se reutiliza en input_p1 para gestionar la entrada del segundo jugador.
+📌 **Explicación:**  
+- `r7, #4` → Indica al sistema que queremos escribir.  
+- `r0` → Contiene la dirección del mapa a imprimir.  
+- `swi 0` → Llama al kernel para ejecutar la operación.  
 
-3. Movimiento del Disparo y Detección de Impactos
-La función disparo gestiona el movimiento del proyectil:
+### ⌨️ Entrada del usuario  
+Para leer valores ingresados por el usuario, utilizamos una syscall `#3`:  
 
-  Reduce en una fila y avanza una columna para simular la trayectoria.
-  Se imprime * en cada posición recorrida.
-  Para insertar el asterisco en el mapa, usamos ins_dot1, que:
+```assembly
+mov r7, #3      @ Syscall para leer entrada del usuario
+mov r0, #0      @ Leer desde la entrada estándar
+mov r2, #2      @ Cantidad de caracteres a leer
+ldr r1, =buffer @ Almacenar el valor ingresado en buffer
+swi 0
+```
 
-  Carga * en r2.
-  Obtiene la dirección del mapa en r0.
-  Inserta el carácter en la posición correspondiente.
+📌 **Detalles:**  
+- `r7, #3` → Indica una **lectura de datos**.  
+- `r0, #0` → Se lee desde la **entrada estándar (teclado)**.  
+- `r2, #2` → Se lee un máximo de **2 caracteres**.  
+- `r1` → Dirección donde se almacena el dato ingresado.  
 
-4. Verificación de Trayectoria y Colisiones
-Una de las mayores dificultades fue gestionar la trayectoria dinámica del disparo. Para ello, implementamos:
+### 🎯 Detección de impacto  
+Para verificar si un disparo acierta a un gusano, se usa la función `impacto`:  
 
-while → Mantiene el disparo en movimiento hasta alcanzar un límite.
-Función de impacto (if) → Detecta si el proyectil golpeó a un gusano.
-Función de colisión → Controla si el disparo sale del mapa o choca con otro objeto.
-El while coordina la actualización del mapa, asegurando que los disparos avancen en la dirección correcta para cada jugador:
+```assembly
+ldr r0,=mapa   @ Cargar la dirección del mapa
+ldr r1,=acierto1
+mov r2,#11     @ Fila donde está la lombriz 2
+mov r3,#70     @ Columna donde está la lombriz 2
+bl impacto     @ Llamada a la función impacto
+```
 
-Jugador 1 → Disparo ascendente y hacia la derecha.
-Jugador 2 → Disparo descendente y hacia la izquierda.
+📌 **Flujo del disparo:**  
+1. Se carga el mapa (`r0`).  
+2. Se almacena la posición de impacto (`r1`, `r2`, `r3`).  
+3. Se llama a la función `impacto` para verificar la colisión.  
 
-5. Gestión de Turnos
-La función turno gestiona el flujo del juego:
+### 🔄 Turnos y Juego  
+El juego se desarrolla por turnos alternos, mostrando mensajes en pantalla y permitiendo que los jugadores ingresen la pendiente del disparo.  
 
-Muestra mensajes indicando el turno del jugador.
-Espera la entrada del usuario para definir la pendiente del disparo.
-Cambia de turno tras cada intento.
-Cada jugada se ejecuta en etapas definidas por el código, asegurando el correcto control de los intentos y la jugabilidad para dos jugadores.
+```assembly
+ldr r1,=mensajeturno2  @ Mensaje para el turno del Jugador 2
+mov r2,#longmsj2       
+bl output               @ Mostrar mensaje
 
-## Dificultades Encontradas
-Falta de documentación sobre ARM Assembly → La mayoría de los recursos estaban en inglés y basados en x86 o en equivalencias con C.
-Errores de acceso a memoria → Al manipular el mapa con ciclos, en ocasiones intentábamos acceder a posiciones fuera de rango.
-Integración de funciones → Combinar las funcionalidades desarrolladas por separado en un programa cohesivo fue un reto.
-Duplicación de código → Para manejar dos jugadores, inicialmente duplicamos código, aunque era posible optimizarlo, lo que complicó la gestión de valores en memoria.
+bl turno_p2             @ Llamar a la función del turno de P2
+```
 
-## Conclusiones
-Trabajar en ARM Assembly resultó un desafío tanto técnico como conceptual.
+📌 **Detalles:**  
+- Se muestra un mensaje indicando el **turno actual**.  
+- Se llama a la función `turno_p2` para procesar la jugada del Jugador 2.  
 
-- Fue necesario investigar múltiples fuentes y probar distintos enfoques para implementar correctamente las funciones requeridas.
-- Aprendimos cómo funcionan las syscalls y la interacción directa con el sistema operativo a nivel de bajo nivel.
-- Nos permitió comprender mejor el funcionamiento interno de un sistema, reforzando la importancia de la eficiencia y la organización en la programación.
-- Este proyecto nos ayudó a valorar las ventajas de los lenguajes de alto nivel y a entender la base de la computación desde su núcleo más esencial.
+---
+
+## 🚧 Dificultades encontradas  
+
+✅ **Falta de documentación en ARM Assembly** → La mayoría de la información disponible es para x86.  
+✅ **Errores al modificar el mapa** → Al ingresar nuevos caracteres, surgían errores de segmentación.  
+✅ **Estructura del código** → Al integrar todas las funcionalidades, mantener un flujo lógico fue complicado.  
+✅ **Optimización** → Para mantener la jugabilidad en turnos, se duplicó código en lugar de reutilizar funciones.  
+
+## 📌 Conclusiones  
+
+Trabajar en **Assembly** nos permitió entender el funcionamiento de bajo nivel de un programa y la importancia de las **syscalls** en la interacción con el sistema operativo. Si bien es un lenguaje complejo, nos brindó una nueva perspectiva sobre cómo los lenguajes de alto nivel abstraen estos procesos.  
+
+---
+
+## 🛠️ Cómo ejecutar el código  
+
+Si quieres probar el juego en tu entorno:  
+
+1️⃣ **Compila el código:**  
+```bash
+as -o gusanos.o gusanos.s
+ld -o gusanos gusanos.o
+```
+2️⃣ **Ejecuta el programa:**  
+```bash
+./gusanos
+```
+3️⃣ **Abre PuTTY para jugar** en un entorno Linux.  
+
+---
+
+📂 **Estructura del repositorio:**  
+
+```
+/worm-armageddon-asm
+│── README.md
+│── gusanos.s  (Código principal en Assembly)
+│── mapa.s     (Representación del mapa)
+│── impacto.s  (Manejo de colisiones)
+│── turno.s    (Lógica de turnos)
+└── compilacion.txt (Instrucciones para compilar)
+```
+
+
