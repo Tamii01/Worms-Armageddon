@@ -106,16 +106,4 @@ ld -o gusanos gusanos.o
 
 ---
 
-📂 **Estructura del repositorio:**  
-
-```
-/worm-armageddon-asm
-│── README.md
-│── gusanos.s  (Código principal en Assembly)
-│── mapa.s     (Representación del mapa)
-│── impacto.s  (Manejo de colisiones)
-│── turno.s    (Lógica de turnos)
-└── compilacion.txt (Instrucciones para compilar)
-```
-
 
